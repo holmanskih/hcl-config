@@ -1,64 +1,89 @@
 package main
 
 import (
-	"io"
+	"fmt"
 	"io/ioutil"
 	"log"
-	"os"
-	"path/filepath"
 
-	"github.com/hashicorp/hcl/v2"
-	"github.com/hashicorp/hcl/v2/gohcl"
-	"github.com/hashicorp/hcl/v2/hclsyntax"
+	"github.com/hashicorp/hcl"
+	"github.com/hashicorp/hcl/hcl/ast"
 )
 
+type APIConfig struct {
+	Host string `hcl:"host"`
+	Port int    `hcl:"port"`
+}
+
 type Config struct {
-	A string `hcl:"a"`
+	API *APIConfig `hcl:"api"`
 }
 
 func main() {
-	cfg, err := ParseFile("config.hcl")
+	cfg, err := LoadConfigFile("config.hcl")
 	if err != nil {
 		log.Fatalf("failed file parsing %s", err)
 	}
 
-	log.Print(cfg)
+	log.Print(cfg.API)
 }
 
-func ParseFile(filename string) (*Config, error) {
-	f, err := os.Open(filename)
+func LoadConfigFile(path string) (*Config, error) {
+	d, err := ioutil.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	return ParseConfig(string(d))
+}
+
+func ParseConfig(d string) (*Config, error) {
+	obj, err := hcl.Parse(d)
 	if err != nil {
 		return nil, err
 	}
 
-	defer f.Close()
-
-	// check extension hcl or json
-	extension := filepath.Ext(filename)
-	if len(extension) > 0 {
-		extension = extension[1:]
-	}
-
-	return parseHCL(f, filename)
-}
-
-func parseHCL(r io.Reader, filename string) (*Config, error) {
-	src, err := ioutil.ReadAll(r)
-	if err != nil {
+	var result Config
+	if err := hcl.DecodeObject(&result, obj); err != nil {
 		return nil, err
 	}
 
-	f, diag := hclsyntax.ParseConfig(src, filename, hcl.Pos{})
-
-	if diag.HasErrors() {
-		return nil, diag
+	list, ok := obj.Node.(*ast.ObjectList)
+	if !ok {
+		return nil, fmt.Errorf("error parsing: file doesn't contain a root object")
 	}
 
-	var config Config
-	diag = gohcl.DecodeBody(f.Body, nil, &config)
-	if diag.HasErrors() {
-		return nil, diag
+	// Parse seperate fields
+	if o := list.Filter("api"); len(o.Items) > 0 {
+		if err := parseAPI(&result, o); err != nil {
+			return nil, err
+		}
 	}
 
-	return &config, nil
+	log.Print(result)
+
+	return &result, nil
+}
+
+func parseAPI(result *Config, list *ast.ObjectList) error {
+	if len(list.Items) > 1 {
+		return fmt.Errorf("only one 'telemetry' block is permitted")
+	}
+
+	// Get our one item
+	item := list.Items[0]
+
+	log.Print(item)
+
+	var c APIConfig
+	if err := hcl.DecodeObject(&c, item.Val); err != nil {
+		return err
+	}
+
+	if result.API == nil {
+		result.API = &APIConfig{}
+	}
+
+	if err := hcl.DecodeObject(&result.API, item.Val); err != nil {
+		return err
+	}
+	return nil
 }
