@@ -1,12 +1,12 @@
 package main
 
 import (
-	"fmt"
 	"io/ioutil"
 	"log"
 
 	"github.com/hashicorp/hcl"
 	"github.com/hashicorp/hcl/hcl/ast"
+	"github.com/pkg/errors"
 )
 
 type APIConfig struct {
@@ -14,9 +14,35 @@ type APIConfig struct {
 	Port int    `hcl:"port"`
 }
 
-type Config struct {
-	API *APIConfig `hcl:"api"`
+type NutsDBCfg struct {
+	Path        string `hcl:"path"`
+	SegmentSize int64  `hcl:"segment_size"`
 }
+
+type RedisConf struct {
+	DevMode  bool   `hcl:"dev_mode"`
+	Password string `hcl:"password"`
+	Host     string `hcl:"host"`
+}
+
+type CacheCfg struct {
+	Type string `hcl:"type"`
+
+	Redis  RedisConf `hcl:"redis"`
+	NutsDB NutsDBCfg `hcl:"nutsdb"`
+}
+
+// Root config structure
+type Config struct {
+	API        APIConfig `hcl:"api"`
+	EnableAuth bool      `hcl:"enable_auth"`
+	Cache      CacheCfg  `hcl:"cache"`
+}
+
+var (
+	DecodeHCLBlockError = errors.New("failed to decode the hcl block")
+	FilterHCListError   = errors.New("only one hcl block is permitted")
+)
 
 func main() {
 	cfg, err := LoadConfigFile("config.hcl")
@@ -24,13 +50,13 @@ func main() {
 		log.Fatalf("failed file parsing %s", err)
 	}
 
-	log.Print(cfg.API)
+	log.Printf("loaded config %v", cfg.Cache)
 }
 
 func LoadConfigFile(path string) (*Config, error) {
 	d, err := ioutil.ReadFile(path)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to read the file")
 	}
 	return ParseConfig(string(d))
 }
@@ -38,7 +64,7 @@ func LoadConfigFile(path string) (*Config, error) {
 func ParseConfig(d string) (*Config, error) {
 	obj, err := hcl.Parse(d)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to parse the hcl file")
 	}
 
 	var result Config
@@ -48,42 +74,65 @@ func ParseConfig(d string) (*Config, error) {
 
 	list, ok := obj.Node.(*ast.ObjectList)
 	if !ok {
-		return nil, fmt.Errorf("error parsing: file doesn't contain a root object")
+		return nil, errors.Wrap(err, "file doesnt contain the root object")
 	}
 
-	// Parse seperate fields
+	// Parse hcl blocks
 	if o := list.Filter("api"); len(o.Items) > 0 {
 		if err := parseAPI(&result, o); err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "failed to get the hcl block")
 		}
 	}
 
-	log.Print(result)
+	if o := list.Filter("cache"); len(o.Items) > 0 {
+		if err := parseCache(&result, o); err != nil {
+			return nil, errors.Wrap(err, "failed to get the hcl block")
+		}
+	}
 
 	return &result, nil
 }
 
 func parseAPI(result *Config, list *ast.ObjectList) error {
 	if len(list.Items) > 1 {
-		return fmt.Errorf("only one 'telemetry' block is permitted")
+		return FilterHCListError
 	}
 
-	// Get our one item
 	item := list.Items[0]
-
-	log.Print(item)
 
 	var c APIConfig
 	if err := hcl.DecodeObject(&c, item.Val); err != nil {
-		return err
+		return errors.Wrap(err, "decode hcl block err")
 	}
 
-	if result.API == nil {
-		result.API = &APIConfig{}
+	if result.API == (APIConfig{}) {
+		result.API = APIConfig{}
 	}
 
 	if err := hcl.DecodeObject(&result.API, item.Val); err != nil {
-		return err
+		return DecodeHCLBlockError
+	}
+	return nil
+}
+
+func parseCache(result *Config, list *ast.ObjectList) error {
+	if len(list.Items) > 1 {
+		return FilterHCListError
+	}
+
+	item := list.Items[0]
+
+	var c CacheCfg
+	if err := hcl.DecodeObject(&c, item.Val); err != nil {
+		return errors.Wrap(err, "decode hcl block err")
+	}
+
+	if result.Cache == (CacheCfg{}) {
+		result.Cache = CacheCfg{}
+	}
+
+	if err := hcl.DecodeObject(&result.Cache, item.Val); err != nil {
+		return DecodeHCLBlockError
 	}
 	return nil
 }
