@@ -5,7 +5,7 @@ api {
 
 enable_auth = true
 
-cache "local" "master" {
+cache {
   type = "redis"
 
   redis {

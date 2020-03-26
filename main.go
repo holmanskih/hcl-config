@@ -1,15 +1,19 @@
 package main
 
 import (
+	"io"
 	"io/ioutil"
 	"log"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/hashicorp/hcl"
 	"github.com/hashicorp/hcl/hcl/ast"
 	"github.com/pkg/errors"
 )
 
-const flag = "master"
+const cfgFlag = "master"
 
 type APIConfig struct {
 	Host string `hcl:"host"`
@@ -62,23 +66,83 @@ var (
 )
 
 func main() {
-	cfg, err := LoadConfigFile("config.hcl")
+	cfg, err := LoadConfig("env", cfgFlag)
 	if err != nil {
-		log.Fatalf("failed file parsing %s", err)
+		log.Fatalf("failed file parsing: %s", err)
 	}
 
 	log.Printf("loaded config %v", cfg.Rabbit)
 }
 
-func LoadConfigFile(path string) (*Config, error) {
+// LoadConfig loads the configuration at the given path, regardless if
+// its a file or directory.
+func LoadConfig(path, flag string) (*Config, error) {
+	fi, err := os.Stat(path)
+	if err != nil {
+		return nil, err
+	}
+
+	if fi.IsDir() {
+		return LoadConfigDir(path, flag)
+	}
+	return LoadConfigFile(path, flag)
+}
+
+// LoadConfigDir loads all the configurations in the given directory
+// in alphabetical order.
+func LoadConfigDir(dir, flag string) (*Config, error) {
+	f, err := os.Open(dir)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	var files []string
+	err = nil
+	for err != io.EOF {
+		var fileInfos []os.FileInfo
+		fileInfos, err = f.Readdir(128)
+		if err != nil && err != io.EOF {
+			return nil, err
+		}
+
+		for _, fileInfo := range fileInfos {
+			// Ignore directories
+			if fileInfo.IsDir() {
+				continue
+			}
+
+			// Filter files with .hcl extension
+			name := fileInfo.Name()
+			if strings.HasSuffix(name, ".hcl") {
+				path := filepath.Join(dir, name)
+				files = append(files, path)
+			}
+		}
+	}
+
+	var result *Config
+	for _, f := range files {
+		config, err := LoadConfigFile(f, flag)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error loading %q", f)
+		}
+
+		result = config
+	}
+
+	return result, nil
+}
+
+func LoadConfigFile(path, flag string) (*Config, error) {
 	d, err := ioutil.ReadFile(path)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to read the file")
 	}
-	return ParseConfig(string(d))
+	return ParseConfig(string(d), flag)
 }
 
-func ParseConfig(d string) (*Config, error) {
+func ParseConfig(d, flag string) (*Config, error) {
 	obj, err := hcl.Parse(d)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to parse the hcl file")
@@ -97,20 +161,19 @@ func ParseConfig(d string) (*Config, error) {
 	// Parse hcl blocks
 	if o := list.Filter("api"); len(o.Items) > 0 {
 		if err := parseAPI(&result, o); err != nil {
-			return nil, errors.Wrap(err, "failed to get the hcl block")
+			return nil, errors.Wrap(err, "failed to get the api hcl block")
 		}
 	}
 
 	if o := list.Filter("cache"); len(o.Items) > 0 {
 		if err := parseCache(&result, o); err != nil {
-			return nil, errors.Wrap(err, "failed to get the hcl block")
+			return nil, errors.Wrap(err, "failed to get the cache hcl block")
 		}
 	}
 
 	if o := list.Filter("rabbitmq"); len(o.Items) > 0 {
-
-		if err := parseRabbit(&result, o); err != nil {
-			return nil, errors.Wrap(err, "failed to get the hcl block")
+		if err := parseRabbit(&result, o, flag); err != nil {
+			return nil, errors.Wrap(err, "failed to get the rabbitmq hcl block")
 		}
 	}
 
@@ -161,7 +224,7 @@ func parseCache(result *Config, list *ast.ObjectList) error {
 	return nil
 }
 
-func parseRabbit(result *Config, list *ast.ObjectList) error {
+func parseRabbit(result *Config, list *ast.ObjectList, flag string) error {
 	if len(list.Items) > 3 {
 		return FilterHCListError
 	}
