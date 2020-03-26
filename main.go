@@ -9,6 +9,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+const flag = "master"
+
 type APIConfig struct {
 	Host string `hcl:"host"`
 	Port int    `hcl:"port"`
@@ -32,16 +34,31 @@ type CacheCfg struct {
 	NutsDB NutsDBCfg `hcl:"nutsdb"`
 }
 
+type CommonCfg struct {
+	Exchange     string `hcl:"exchange"`
+	ExchangeType string `hcl:"exchange_type"`
+}
+
+type RabbitMQCfg struct {
+	Host        string    `hcl:"host"`
+	User        string    `hcl:"user"`
+	Password    string    `hcl:"password"`
+	ConsumerTag string    `hcl:"consumer_tag"`
+	Common      CommonCfg `hcl:"common"`
+}
+
 // Root config structure
 type Config struct {
-	API        APIConfig `hcl:"api"`
-	EnableAuth bool      `hcl:"enable_auth"`
-	Cache      CacheCfg  `hcl:"cache"`
+	API        APIConfig   `hcl:"api"`
+	EnableAuth bool        `hcl:"enable_auth"`
+	Cache      CacheCfg    `hcl:"cache"`
+	Rabbit     RabbitMQCfg `hcl:"rabbitmq"`
 }
 
 var (
 	DecodeHCLBlockError = errors.New("failed to decode the hcl block")
 	FilterHCListError   = errors.New("only one hcl block is permitted")
+	WrongHCLBlockLabel  = errors.New("wrong hcl block label name")
 )
 
 func main() {
@@ -50,7 +67,7 @@ func main() {
 		log.Fatalf("failed file parsing %s", err)
 	}
 
-	log.Printf("loaded config %v", cfg.Cache)
+	log.Printf("loaded config %v", cfg.Rabbit)
 }
 
 func LoadConfigFile(path string) (*Config, error) {
@@ -86,6 +103,13 @@ func ParseConfig(d string) (*Config, error) {
 
 	if o := list.Filter("cache"); len(o.Items) > 0 {
 		if err := parseCache(&result, o); err != nil {
+			return nil, errors.Wrap(err, "failed to get the hcl block")
+		}
+	}
+
+	if o := list.Filter("rabbitmq"); len(o.Items) > 0 {
+
+		if err := parseRabbit(&result, o); err != nil {
 			return nil, errors.Wrap(err, "failed to get the hcl block")
 		}
 	}
@@ -133,6 +157,30 @@ func parseCache(result *Config, list *ast.ObjectList) error {
 
 	if err := hcl.DecodeObject(&result.Cache, item.Val); err != nil {
 		return DecodeHCLBlockError
+	}
+	return nil
+}
+
+func parseRabbit(result *Config, list *ast.ObjectList) error {
+	if len(list.Items) > 3 {
+		return FilterHCListError
+	}
+
+	filteredList := list.Filter(flag)
+	if len(filteredList.Items) == 0 {
+		return WrongHCLBlockLabel
+	}
+
+	var m RabbitMQCfg
+	for _, item := range filteredList.Items {
+
+		if err := hcl.DecodeObject(&m, item); err != nil {
+			return DecodeHCLBlockError
+		}
+
+		if err := hcl.DecodeObject(&result.Rabbit, item.Val); err != nil {
+			return DecodeHCLBlockError
+		}
 	}
 	return nil
 }

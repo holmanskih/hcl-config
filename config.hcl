@@ -19,3 +19,25 @@ cache "local" "master" {
     segment_size = 1024
   }
 }
+
+// common-different configs with labels
+rabbitmq {
+  consumer_tag = "consumer"
+
+  common {
+    exchange = "service.direct"
+    exchange_type = "direct"
+  }
+}
+
+rabbitmq "master" {
+  host = "rabbitmq:5672"
+  user = "master"
+  password = "password"
+}
+
+rabbitmq "local" {
+  host = "0.0.0.0:5672"
+  user = "bitnami"
+  password = "password"
+}
