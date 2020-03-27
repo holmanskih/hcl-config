@@ -14,5 +14,5 @@ func main() {
 		log.Fatalf("failed file parsing: %s", err)
 	}
 
-	log.Printf("loaded config %v", cfg.Rabbit)
+	log.Printf("loaded config %v", cfg)
 }

@@ -19,8 +19,8 @@ type RedisConf struct {
 type CacheCfg struct {
 	Type string `hcl:"type"`
 
-	Redis  RedisConf `hcl:"redis"`
-	NutsDB NutsDBCfg `hcl:"nutsdb"`
+	Redis  RedisConf `hcl:"redis,block"`
+	NutsDB NutsDBCfg `hcl:"nutsdb,block"`
 }
 
 type CommonCfg struct {
@@ -38,8 +38,8 @@ type RabbitMQCfg struct {
 
 // Root config structure
 type Config struct {
-	API        APIConfig   `hcl:"api"`
-	EnableAuth bool        `hcl:"enable_auth"`
-	Cache      CacheCfg    `hcl:"cache"`
-	Rabbit     RabbitMQCfg `hcl:"rabbitmq"`
+	API        APIConfig `hcl:"api,block"`
+	EnableAuth bool      `hcl:"enable_auth"`
+	Cache      CacheCfg  `hcl:"cache,block"`
+	//Rabbit     RabbitMQCfg `hcl:"rabbitmq"`
 }

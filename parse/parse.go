@@ -1,8 +1,6 @@
 package parse
 
 import (
-	"log"
-
 	"github.com/hashicorp/hcl"
 	"github.com/hashicorp/hcl/hcl/ast"
 	"github.com/pkg/errors"
@@ -10,21 +8,6 @@ import (
 	"github.com/holmanskih/hcl-config/config"
 )
 
-type parseBlockFunc func(*config.Config, *ast.ObjectList) error
-
-//type parseLabelBlockFunc func(*config.Config, *ast.ObjectList, string) error
-//
-//type Parser interface {
-//	ParseBlock() error
-//}
-//
-//func (f parseBlockFunc) ParseBlock() error {
-//	return nil
-//}
-//
-//func (f parseLabelBlockFunc) ParseBlock() error  {
-//	return nil
-//}
 func ParseConfig(d, flag string) (*config.Config, error) {
 	obj, err := hcl.Parse(d)
 	if err != nil {
@@ -42,11 +25,6 @@ func ParseConfig(d, flag string) (*config.Config, error) {
 	}
 
 	// Parse hcl blocks
-	//err = parseHCLBlock(cfg, "api", 0, list, parseAPI)
-	//if err != nil {
-	//	return nil, errors.Wrap(err, "failed to get the api hcl block")
-	//}
-
 	if o := list.Filter("api"); len(o.Items) > 0 {
 		if err := parseAPI(&cfg, o); err != nil {
 			return nil, errors.Wrap(err, "failed to get the api hcl block")
@@ -66,21 +44,6 @@ func ParseConfig(d, flag string) (*config.Config, error) {
 	}
 
 	return &cfg, nil
-}
-
-func parseHCLBlock(cfg config.Config, hclBlockName string, cfgBlocksNumber int, list *ast.ObjectList, parse parseBlockFunc) error {
-	block := list.Filter(hclBlockName)
-	log.Printf("block sizes are %v and %v", len(block.Items), cfgBlocksNumber)
-
-	if len(block.Items) > cfgBlocksNumber {
-		err := parse(&cfg, block)
-		if err != nil {
-			return errors.Wrap(err, "failed to get the cache hcl block")
-		}
-		return nil
-	}
-
-	return FilterHCListError
 }
 
 func parseAPI(result *config.Config, list *ast.ObjectList) error {
