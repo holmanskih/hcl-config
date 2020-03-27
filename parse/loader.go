@@ -2,20 +2,15 @@ package parse
 
 import (
 	"io"
-	"io/ioutil"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/hashicorp/hcl/v2/hclsimple"
 	"github.com/pkg/errors"
 
 	"github.com/holmanskih/hcl-config/config"
-)
-
-var (
-	DecodeHCLBlockError = errors.New("failed to decode the hcl block")
-	FilterHCListError   = errors.New("only one hcl block is permitted")
-	WrongHCLBlockLabel  = errors.New("wrong hcl block label name")
 )
 
 func LoadConfig(path, flag string) (*config.Config, error) {
@@ -75,9 +70,10 @@ func LoadConfigDir(dir, flag string) (*config.Config, error) {
 }
 
 func LoadConfigFile(path, flag string) (*config.Config, error) {
-	d, err := ioutil.ReadFile(path)
+	var cfg config.Config
+	err := hclsimple.DecodeFile("env/common.config.hcl", nil, &cfg)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to read the file")
+		log.Fatalf("Failed to load configuration: %s", err)
 	}
-	return ParseConfig(string(d), flag)
+	return &cfg, nil
 }

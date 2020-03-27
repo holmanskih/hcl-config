@@ -33,13 +33,13 @@ type RabbitMQCfg struct {
 	User        string    `hcl:"user"`
 	Password    string    `hcl:"password"`
 	ConsumerTag string    `hcl:"consumer_tag"`
-	Common      CommonCfg `hcl:"common"`
+	Common      CommonCfg `hcl:"common,block"`
 }
 
 // Root config structure
 type Config struct {
-	API        APIConfig `hcl:"api,block"`
-	EnableAuth bool      `hcl:"enable_auth"`
-	Cache      CacheCfg  `hcl:"cache,block"`
-	//Rabbit     RabbitMQCfg `hcl:"rabbitmq"`
+	API        APIConfig   `hcl:"api,block"`
+	EnableAuth bool        `hcl:"enable_auth"`
+	Cache      CacheCfg    `hcl:"cache,block"`
+	Rabbit     RabbitMQCfg `hcl:"rabbitmq,label"`
 }
