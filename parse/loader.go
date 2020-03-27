@@ -13,19 +13,19 @@ import (
 	"github.com/holmanskih/hcl-config/config"
 )
 
-func LoadConfig(path, flag string) (*config.Config, error) {
+func LoadConfig(path string) (*config.Config, error) {
 	fi, err := os.Stat(path)
 	if err != nil {
 		return nil, err
 	}
 
 	if fi.IsDir() {
-		return LoadConfigDir(path, flag)
+		return LoadConfigDir(path)
 	}
-	return LoadConfigFile(path, flag)
+	return LoadConfigFile(path)
 }
 
-func LoadConfigDir(dir, flag string) (*config.Config, error) {
+func LoadConfigDir(dir string) (*config.Config, error) {
 	f, err := os.Open(dir)
 	if err != nil {
 		return nil, err
@@ -58,7 +58,7 @@ func LoadConfigDir(dir, flag string) (*config.Config, error) {
 
 	var result *config.Config
 	for _, f := range files {
-		config, err := LoadConfigFile(f, flag)
+		config, err := LoadConfigFile(f)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error loading %s", f)
 		}
@@ -69,9 +69,9 @@ func LoadConfigDir(dir, flag string) (*config.Config, error) {
 	return result, nil
 }
 
-func LoadConfigFile(path, flag string) (*config.Config, error) {
+func LoadConfigFile(path string) (*config.Config, error) {
 	var cfg config.Config
-	err := hclsimple.DecodeFile("env/common.config.hcl", nil, &cfg)
+	err := hclsimple.DecodeFile(path, nil, &cfg)
 	if err != nil {
 		log.Fatalf("Failed to load configuration: %s", err)
 	}

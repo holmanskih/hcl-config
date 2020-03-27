@@ -1,6 +1,6 @@
 api {
   host = "0.0.0.0"
-  port = 8000
+  port = 89000
 }
 
 enable_auth = true
@@ -20,3 +20,11 @@ cache {
   }
 }
 
+rabbitmq "local" "master" {
+  consumer_tag = "consumer"
+
+  common {
+    exchange = "service.direct"
+    exchange_type = "direct"
+  }
+}

@@ -29,17 +29,17 @@ type CommonCfg struct {
 }
 
 type RabbitMQCfg struct {
-	Host        string    `hcl:"host"`
-	User        string    `hcl:"user"`
-	Password    string    `hcl:"password"`
+	Type string `hcl:"type,label"` // hcl meta data for block+label configurations
+	Name string `hcl:"name,label"` // hcl meta data for block+label configurations
+
 	ConsumerTag string    `hcl:"consumer_tag"`
 	Common      CommonCfg `hcl:"common,block"`
 }
 
 // Root config structure
 type Config struct {
-	API        APIConfig   `hcl:"api,block"`
-	EnableAuth bool        `hcl:"enable_auth"`
-	Cache      CacheCfg    `hcl:"cache,block"`
-	Rabbit     RabbitMQCfg `hcl:"rabbitmq,label"`
+	API        APIConfig     `hcl:"api,block"`
+	EnableAuth bool          `hcl:"enable_auth"`
+	Cache      CacheCfg      `hcl:"cache,block"`
+	Rabbit     []RabbitMQCfg `hcl:"rabbitmq,block"`
 }
