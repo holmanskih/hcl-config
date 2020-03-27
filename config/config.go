@@ -41,5 +41,5 @@ type Config struct {
 	API        APIConfig     `hcl:"api,block"`
 	EnableAuth bool          `hcl:"enable_auth"`
 	Cache      CacheCfg      `hcl:"cache,block"`
-	Rabbit     []RabbitMQCfg `hcl:"rabbitmq,block"`
+	Rabbit     []RabbitMQCfg `hcl:"rabbitmq,block"` // hcl configs for local/master block+label configurations
 }
